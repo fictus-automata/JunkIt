@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -67,6 +68,7 @@ import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.junkphoto.cleaner.db.JunkPhotoEntity
+import com.junkphoto.cleaner.util.PreferenceManager
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -149,16 +151,30 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Photo grid section
+                // Photo grid section — sorted by expiresAt, grouped by TTL
                 if (junkPhotos.isNotEmpty()) {
+                    // Sort by ascending expiration time (soonest to delete first)
+                    val sorted = remember(junkPhotos) {
+                        junkPhotos.sortedBy { it.expiresAt }
+                    }
+
+                    // Group by TTL label
+                    val grouped = remember(sorted) {
+                        val ttlLabelMap = PreferenceManager.TTL_OPTIONS.entries
+                            .associate { (label, millis) -> millis to label }
+
+                        sorted.groupBy { photo ->
+                            ttlLabelMap[photo.ttlMillis] ?: formatTtl(photo.ttlMillis)
+                        }
+                    }
+
                     Text(
-                        "Recent Junk Photos",
+                        "Junk Photos",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
 
-                    val displayPhotos = junkPhotos.take(30)
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
                         modifier = Modifier
@@ -168,12 +184,53 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        items(displayPhotos, key = { it.id }) { photo ->
-                            JunkPhotoGridItem(
-                                photo = photo,
-                                onTap = { fullscreenPhoto = photo },
-                                onUnjunk = { onUnjunk(photo.id) }
-                            )
+                        grouped.forEach { (label, photos) ->
+                            // Section header spanning full width
+                            item(
+                                key = "header_$label",
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            start = 12.dp,
+                                            end = 12.dp,
+                                            top = 18.dp,
+                                            bottom = 12.dp
+                                        ),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "(${photos.size})",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            // Photos in this group
+                            items(photos, key = { it.id }) { photo ->
+                                JunkPhotoGridItem(
+                                    photo = photo,
+                                    onTap = { fullscreenPhoto = photo },
+                                    onUnjunk = { onUnjunk(photo.id) }
+                                )
+                            }
                         }
                     }
                 } else {
