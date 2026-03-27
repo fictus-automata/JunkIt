@@ -1,21 +1,27 @@
 package com.junkphoto.cleaner.ui.screens
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,37 +38,35 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.junkphoto.cleaner.db.JunkPhotoEntity
-import com.junkphoto.cleaner.util.PreferenceManager
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -79,95 +83,168 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onUnjunk: (Long) -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "JunkIt",
-                        fontWeight = FontWeight.Bold
+    // Fullscreen viewer state lifted to HomeScreen level
+    var fullscreenPhoto by remember { mutableStateOf<JunkPhotoEntity?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "JunkIt",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    actions = {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
-                },
-                actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Junk Mode toggle card
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                JunkModeCard(
-                    isActive = isJunkModeActive,
-                    onToggle = onToggleJunkMode
                 )
             }
-
-            // Stats row
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // Top section: toggle, stats, config
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.PhotoLibrary,
-                        label = "Tracked",
-                        value = "$activeCount"
+                    Spacer(modifier = Modifier.height(4.dp))
+                    JunkModeCard(
+                        isActive = isJunkModeActive,
+                        onToggle = onToggleJunkMode
                     )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Default.Delete,
-                        label = "Cleaned",
-                        value = "$deletedCount"
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.PhotoLibrary,
+                            label = "Tracked",
+                            value = "$activeCount"
+                        )
+                        StatCard(
+                            modifier = Modifier.weight(1f),
+                            icon = Icons.Default.Delete,
+                            label = "Cleaned",
+                            value = "$deletedCount"
+                        )
+                    }
+
+                    ConfigInfoCard(
+                        ttlMillis = ttlMillis,
+                        monitoredDir = monitoredDir
                     )
                 }
-            }
 
-            // Current config info
-            item {
-                ConfigInfoCard(
-                    ttlMillis = ttlMillis,
-                    monitoredDir = monitoredDir
-                )
-            }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            // Recent junk photos header
-            if (junkPhotos.isNotEmpty()) {
-                item {
+                // Photo grid section
+                if (junkPhotos.isNotEmpty()) {
                     Text(
                         "Recent Junk Photos",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
-                }
 
-                items(junkPhotos.take(20)) { photo ->
-                    JunkPhotoItem(
-                        photo = photo,
-                        onUnjunk = { onUnjunk(photo.id) }
+                    val displayPhotos = junkPhotos.take(30)
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 2.dp),
+                        contentPadding = PaddingValues(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        items(displayPhotos, key = { it.id }) { photo ->
+                            JunkPhotoGridItem(
+                                photo = photo,
+                                onTap = { fullscreenPhoto = photo },
+                                onUnjunk = { onUnjunk(photo.id) }
+                            )
+                        }
+                    }
+                } else {
+                    EmptyStateCard(
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
-                }
-            } else {
-                item {
-                    EmptyStateCard()
                 }
             }
+        }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) }
+        // Fullscreen overlay — drawn on top of Scaffold
+        fullscreenPhoto?.let { photo ->
+            FullscreenPhotoViewer(
+                photo = photo,
+                onDismiss = { fullscreenPhoto = null },
+                onUnjunk = {
+                    onUnjunk(photo.id)
+                    fullscreenPhoto = null
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FullscreenPhotoViewer(
+    photo: JunkPhotoEntity,
+    onDismiss: () -> Unit,
+    onUnjunk: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(10f)
+            .background(Color.Black)
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(File(photo.filePath))
+                .crossfade(true)
+                .build(),
+            contentDescription = "Fullscreen photo",
+            modifier = Modifier.fillMaxWidth(),
+            contentScale = ContentScale.Fit
+        )
+
+        // Keep button at bottom-right
+        TextButton(
+            onClick = onUnjunk,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(24.dp)
+                .background(
+                    color = Color.White.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(24.dp)
+                )
+        ) {
+            Icon(
+                Icons.Default.PhotoLibrary,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                "Keep",
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge
+            )
         }
     }
 }
@@ -334,105 +411,140 @@ private fun ConfigInfoCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun JunkPhotoItem(
+private fun JunkPhotoGridItem(
     photo: JunkPhotoEntity,
+    onTap: () -> Unit,
     onUnjunk: () -> Unit
 ) {
-    var showFullscreen by remember { mutableStateOf(false) }
+    var showBottomSheet by remember { mutableStateOf(false) }
 
-    if (showFullscreen) {
-        Dialog(onDismissRequest = { showFullscreen = false }) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.9f))
-                    .clickable {showFullscreen = false},
-                contentAlignment = Alignment.Center
-            ) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(File(photo.filePath))
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Fullscreen photo",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-        }
-    }
-
-    Card(
-        modifier = Modifier.clickable { showFullscreen = true },
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+    // Bottom sheet with details
+    if (showBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showBottomSheet = false },
+            sheetState = rememberModalBottomSheetState()
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
+                // Thumbnail preview
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(File(photo.filePath))
                         .crossfade(true)
                         .build(),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(12.dp)),
                     contentScale = ContentScale.Crop
                 )
-            }
 
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = photo.fileName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = formatTimeRemaining(photo.expiresAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = formatFileSize(photo.fileSize),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                androidx.compose.material3.TextButton(
-                    onClick = onUnjunk,
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Keep", style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = formatTimeRemaining(photo.expiresAt),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = formatFileSize(photo.fileSize),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                TextButton(
+                    onClick = {
+                        onUnjunk()
+                        showBottomSheet = false
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        Icons.Default.PhotoLibrary,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Keep this photo", style = MaterialTheme.typography.labelLarge)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+    }
+
+    // Grid thumbnail tile
+    Box(
+        modifier = Modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .combinedClickable(
+                onClick = { onTap() },
+                onLongClick = { showBottomSheet = true }
+            )
+    ) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(File(photo.filePath))
+                .crossfade(true)
+                .size(300)
+                .build(),
+            contentDescription = photo.fileName,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        // Gradient overlay at the bottom with time remaining
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
+                    )
+                )
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = formatTimeRemaining(photo.expiresAt),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                fontSize = 10.sp,
+                maxLines = 1
+            )
         }
     }
 }
 
 @Composable
-private fun EmptyStateCard() {
+private fun EmptyStateCard(modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
@@ -490,6 +602,7 @@ private fun formatTimeRemaining(expiresAt: Long): String {
                 val mins = TimeUnit.MILLISECONDS.toMinutes(remaining)
                 "Deletes in ${mins}m"
             }
+
             hours < 24 -> "Deletes in ${hours}h"
             else -> {
                 val days = hours / 24
