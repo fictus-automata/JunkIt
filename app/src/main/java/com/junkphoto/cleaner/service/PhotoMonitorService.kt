@@ -90,15 +90,14 @@ class PhotoMonitorService : Service() {
     private fun startMonitoring() {
         serviceScope.launch {
             val monitoredDir = preferenceManager.monitoredDirectory.first()
-            val ttl = preferenceManager.ttlMillis.first()
 
             cameraObserver = CameraDirectoryObserver(monitoredDir) { filePath ->
-                onNewPhotoDetected(filePath, ttl)
+                onNewPhotoDetected(filePath)
             }
 
             val started = cameraObserver?.startWatching() ?: false
             if (started) {
-                Log.d(TAG, "Monitoring started for: $monitoredDir (TTL: ${ttl}ms)")
+                Log.d(TAG, "Monitoring started for: $monitoredDir")
                 updateNotification("Watching: $monitoredDir")
             } else {
                 Log.e(TAG, "Failed to start monitoring: $monitoredDir")
@@ -107,7 +106,7 @@ class PhotoMonitorService : Service() {
         }
     }
 
-    private fun onNewPhotoDetected(filePath: String, ttlMillis: Long) {
+    private fun onNewPhotoDetected(filePath: String) {
         // Reset timer when photo is captured
         resetInactivityTimer()
 
@@ -119,6 +118,9 @@ class PhotoMonitorService : Service() {
                     Log.d(TAG, "Photo already tracked: $filePath")
                     return@launch
                 }
+
+                // Read TTL fresh from preferences each time
+                val ttlMillis = preferenceManager.ttlMillis.first()
 
                 val file = File(filePath)
                 val entity = JunkPhotoEntity(
