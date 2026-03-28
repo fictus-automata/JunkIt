@@ -269,39 +269,42 @@ private fun FullscreenPhotoViewer(
             .clickable { onDismiss() },
         contentAlignment = Alignment.Center
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(File(photo.filePath))
-                .crossfade(true)
-                .build(),
-            contentDescription = "Fullscreen photo",
-            modifier = Modifier.fillMaxWidth(),
-            contentScale = ContentScale.Fit
-        )
-
-        // Keep button at bottom-right
-        TextButton(
-            onClick = onUnjunk,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(24.dp)
-                .background(
-                    color = Color.White.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(24.dp)
-                )
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(
-                Icons.Default.PhotoLibrary,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(18.dp)
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(File(photo.filePath))
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Fullscreen photo",
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.Fit
             )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                "Keep",
-                color = Color.White,
-                style = MaterialTheme.typography.labelLarge
-            )
+
+            // Keep button at bottom-right of the image
+            androidx.compose.material3.Button(
+                onClick = onUnjunk,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(10.dp),
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1976D2), // Explicitly blue
+                    contentColor = Color.White
+                ),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    Icons.Default.PhotoLibrary,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    "Keep",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
         }
     }
 }
