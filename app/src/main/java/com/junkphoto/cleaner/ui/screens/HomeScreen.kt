@@ -128,198 +128,199 @@ fun HomeScreen(
                 )
             }
         ) { padding ->
-            Column(
+            // Sort by ascending expiration time (soonest to delete first)
+            val sorted = remember(junkPhotos) {
+                junkPhotos.sortedBy { it.expiresAt }
+            }
+
+            // Group by TTL label
+            val grouped = remember(sorted) {
+                val ttlLabelMap = PreferenceManager.TTL_OPTIONS.entries
+                    .associate { (label, millis) -> millis to label }
+
+                sorted.groupBy { photo ->
+                    ttlLabelMap[photo.ttlMillis] ?: formatTtl(photo.ttlMillis)
+                }
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .padding(horizontal = 2.dp),
+                contentPadding = PaddingValues(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 // Top section: toggle, stats, config
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    JunkModeCard(
-                        isActive = isJunkModeActive,
-                        onToggle = onToggleJunkMode
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Column(
+                        modifier = Modifier
+                            .padding(horizontal = 14.dp)
+                            .padding(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        StatCard(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Default.PhotoLibrary,
-                            label = "Tracked",
-                            value = "$activeCount"
+                        Spacer(modifier = Modifier.height(4.dp))
+                        JunkModeCard(
+                            isActive = isJunkModeActive,
+                            onToggle = onToggleJunkMode
                         )
-                        StatCard(
-                            modifier = Modifier.weight(1f),
-                            icon = Icons.Default.Delete,
-                            label = "Cleaned",
-                            value = "$deletedCount"
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.PhotoLibrary,
+                                label = "Tracked",
+                                value = "$activeCount"
+                            )
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                icon = Icons.Default.Delete,
+                                label = "Cleaned",
+                                value = "$deletedCount"
+                            )
+                        }
+
+                        ConfigInfoCard(
+                            ttlMillis = ttlMillis,
+                            monitoredDir = monitoredDir
                         )
                     }
-
-                    ConfigInfoCard(
-                        ttlMillis = ttlMillis,
-                        monitoredDir = monitoredDir
-                    )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 // Photo grid section — sorted by expiresAt, grouped by TTL
                 if (junkPhotos.isNotEmpty()) {
-                    // Sort by ascending expiration time (soonest to delete first)
-                    val sorted = remember(junkPhotos) {
-                        junkPhotos.sortedBy { it.expiresAt }
-                    }
-
-                    // Group by TTL label
-                    val grouped = remember(sorted) {
-                        val ttlLabelMap = PreferenceManager.TTL_OPTIONS.entries
-                            .associate { (label, millis) -> millis to label }
-
-                        sorted.groupBy { photo ->
-                            ttlLabelMap[photo.ttlMillis] ?: formatTtl(photo.ttlMillis)
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (selectionMode) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = {
-                                    selectionMode = false
-                                    selectedPhotoIds.clear()
-                                }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Cancel")
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (selectionMode) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = {
+                                        selectionMode = false
+                                        selectedPhotoIds.clear()
+                                    }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Cancel")
+                                    }
+                                    Text(
+                                        "${selectedPhotoIds.size} selected",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
+                                Row {
+                                    TextButton(
+                                        onClick = {
+                                            onKeepPhotos(selectedPhotoIds.toList())
+                                            selectionMode = false
+                                            selectedPhotoIds.clear()
+                                        },
+                                        enabled = selectedPhotoIds.isNotEmpty()
+                                    ) {
+                                        Text("Keep")
+                                    }
+                                    TextButton(
+                                        onClick = {
+                                            val photosToDelete = junkPhotos.filter { it.id in selectedPhotoIds }
+                                            onDeletePhotos(photosToDelete)
+                                            selectionMode = false
+                                            selectedPhotoIds.clear()
+                                        },
+                                        enabled = selectedPhotoIds.isNotEmpty(),
+                                        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.error
+                                        )
+                                    ) {
+                                        Text("Delete")
+                                    }
+                                }
+                            } else {
                                 Text(
-                                    "${selectedPhotoIds.size} selected",
+                                    "Junk Photos",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Row {
-                                TextButton(
-                                    onClick = {
-                                        onKeepPhotos(selectedPhotoIds.toList())
-                                        selectionMode = false
-                                        selectedPhotoIds.clear()
-                                    },
-                                    enabled = selectedPhotoIds.isNotEmpty()
-                                ) {
-                                    Text("Keep")
-                                }
-                                TextButton(
-                                    onClick = {
-                                        val photosToDelete = junkPhotos.filter { it.id in selectedPhotoIds }
-                                        onDeletePhotos(photosToDelete)
-                                        selectionMode = false
-                                        selectedPhotoIds.clear()
-                                    },
-                                    enabled = selectedPhotoIds.isNotEmpty(),
-                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    )
-                                ) {
-                                    Text("Delete")
-                                }
-                            }
-                        } else {
-                            Text(
-                                "Junk Photos",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
                         }
                     }
 
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 2.dp),
-                        contentPadding = PaddingValues(2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        grouped.forEach { (label, photos) ->
-                            // Section header spanning full width
-                            item(
-                                key = "header_$label",
-                                span = { GridItemSpan(maxLineSpan) }
+                    grouped.forEach { (label, photos) ->
+                        // Section header spanning full width
+                        item(
+                            key = "header_$label",
+                            span = { GridItemSpan(maxLineSpan) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = 12.dp,
+                                        end = 12.dp,
+                                        top = 18.dp,
+                                        bottom = 12.dp
+                                    ),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(
-                                            start = 12.dp,
-                                            end = 12.dp,
-                                            top = 18.dp,
-                                            bottom = 12.dp
-                                        ),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Default.Schedule,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = label,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "(${photos.size})",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            // Photos in this group
-                            items(photos, key = { it.id }) { photo ->
-                                val isSelected = selectedPhotoIds.contains(photo.id)
-                                JunkPhotoGridItem(
-                                    photo = photo,
-                                    selectionMode = selectionMode,
-                                    isSelected = isSelected,
-                                    onToggleSelect = {
-                                        if (isSelected) {
-                                            selectedPhotoIds.remove(photo.id)
-                                            if (selectedPhotoIds.isEmpty()) selectionMode = false
-                                        } else {
-                                            selectedPhotoIds.add(photo.id)
-                                        }
-                                    },
-                                    onEnterSelectionMode = {
-                                        selectionMode = true
-                                        selectedPhotoIds.add(photo.id)
-                                    },
-                                    onTap = { fullscreenPhoto = photo },
-                                    onUnjunk = { onUnjunk(photo.id) }
+                                Icon(
+                                    Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "(${photos.size})",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
+
+                        // Photos in this group
+                        items(photos, key = { it.id }) { photo ->
+                            val isSelected = selectedPhotoIds.contains(photo.id)
+                            JunkPhotoGridItem(
+                                photo = photo,
+                                selectionMode = selectionMode,
+                                isSelected = isSelected,
+                                onToggleSelect = {
+                                    if (isSelected) {
+                                        selectedPhotoIds.remove(photo.id)
+                                        if (selectedPhotoIds.isEmpty()) selectionMode = false
+                                    } else {
+                                        selectedPhotoIds.add(photo.id)
+                                    }
+                                },
+                                onEnterSelectionMode = {
+                                    selectionMode = true
+                                    selectedPhotoIds.add(photo.id)
+                                },
+                                onTap = { fullscreenPhoto = photo },
+                                onUnjunk = { onUnjunk(photo.id) }
+                            )
+                        }
                     }
                 } else {
-                    EmptyStateCard(
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        EmptyStateCard(
+                            modifier = Modifier.padding(horizontal = 14.dp)
+                        )
+                    }
                 }
             }
         }
