@@ -91,7 +91,8 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onUnjunk: (Long) -> Unit,
     onKeepPhotos: (List<Long>) -> Unit,
-    onDeletePhotos: (List<JunkPhotoEntity>) -> Unit
+    onDeletePhotos: (List<JunkPhotoEntity>) -> Unit,
+    onOpenRecycleBin: () -> Unit
 ) {
     // Fullscreen viewer state lifted to HomeScreen level
     var fullscreenPhoto by remember { mutableStateOf<JunkPhotoEntity?>(null) }
@@ -181,7 +182,8 @@ fun HomeScreen(
                                 modifier = Modifier.weight(1f),
                                 icon = Icons.Default.Delete,
                                 label = "Cleaned",
-                                value = "$deletedCount"
+                                value = "$deletedCount",
+                                onClick = onOpenRecycleBin
                             )
                         }
 
@@ -471,10 +473,11 @@ private fun StatCard(
     modifier: Modifier = Modifier,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    value: String
+    value: String,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
-        modifier = modifier,
+        modifier = if (onClick != null) modifier.clickable { onClick() } else modifier,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),

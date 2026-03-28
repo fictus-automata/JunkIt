@@ -13,6 +13,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -38,6 +39,7 @@ import com.junkphoto.cleaner.util.PreferenceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
+import androidx.core.net.toUri
 
 class MainActivity : ComponentActivity() {
 
@@ -125,6 +127,60 @@ class MainActivity : ComponentActivity() {
                                         if (deletedIds.isNotEmpty()) {
                                             database.junkPhotoDao().markAsDeletedByIds(deletedIds)
                                         }
+                                    }
+                                },
+                                onOpenRecycleBin = {
+//                                    val intents = listOf(
+//                                        // Google Photos newer Trash UI
+//                                        Intent().setClassName("com.google.android.apps.photos", "com.google.android.apps.photos.trash.TrashActivity"),
+//                                        // Google Photos older Trash UI
+//                                        Intent().setClassName("com.google.android.apps.photos", "com.google.android.apps.photos.trash.ui.TrashActivity"),
+//                                        // Google Photos Main App
+////                                        Intent(Intent.ACTION_MAIN).apply {
+////                                            addCategory(Intent.CATEGORY_LAUNCHER)
+////                                            setPackage("com.google.android.apps.photos")
+////                                        },
+//                                        // Samsung Gallery
+//                                        Intent().setClassName("com.sec.android.gallery3d", "com.sec.android.gallery3d.app.GalleryActivity").apply {
+//                                            putExtra("page", "trash")
+//                                        },
+//
+//                                        // General Gallery App
+////                                        Intent(Intent.ACTION_MAIN).apply {
+////                                            addCategory(Intent.CATEGORY_APP_GALLERY)
+////                                        }
+//                                    )
+//
+//                                    var success = false
+//                                    for (intent in intents) {
+//                                        try {
+//                                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+//                                            startActivity(intent)
+//                                            success = true
+//                                            break
+//                                        } catch (e: Exception) {
+//                                            // Ignore and try the next intent
+//                                        }
+//                                    }
+//
+//                                    if (!success) {
+//                                        Toast.makeText(
+//                                            this@MainActivity,
+//                                            "Please open your Gallery's Recycle Bin to view cleaned photos",
+//                                            Toast.LENGTH_LONG
+//                                        ).show()
+//                                    }
+
+                                    val intent = Intent(Intent.ACTION_VIEW).setData("https://photos.google.com/trash".toUri()).setPackage("com.google.android.apps.photos")
+                                    try {
+                                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            "Please open your Gallery's Recycle Bin to view cleaned photos",
+                                            Toast.LENGTH_LONG
+                                        ).show()
                                     }
                                 }
                             )
