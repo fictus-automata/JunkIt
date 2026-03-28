@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
@@ -97,6 +98,9 @@ fun HomeScreen(
     // Fullscreen viewer state lifted to HomeScreen level
     var fullscreenPhoto by remember { mutableStateOf<JunkPhotoEntity?>(null) }
     
+    // Info dialog state
+    var showInfoDialog by remember { mutableStateOf(false) }
+    
     // Selection state
     var selectionMode by remember { mutableStateOf(false) }
     val selectedPhotoIds = remember { mutableStateListOf<Long>() }
@@ -119,6 +123,9 @@ fun HomeScreen(
                         )
                     },
                     actions = {
+                        IconButton(onClick = { showInfoDialog = true }) {
+                            Icon(Icons.Default.Info, contentDescription = "How it works")
+                        }
                         IconButton(onClick = onNavigateToSettings) {
                             Icon(Icons.Default.Settings, contentDescription = "Settings")
                         }
@@ -335,6 +342,31 @@ fun HomeScreen(
                 onUnjunk = {
                     onUnjunk(photo.id)
                     fullscreenPhoto = null
+                }
+            )
+        }
+
+        if (showInfoDialog) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showInfoDialog = false },
+                title = { Text("How it works") },
+                text = {
+                    Text(
+                        "1. Pull down Quick Settings and tap \"Junk Mode\" tile\n" +
+                        "2. Take photos normally with your camera\n" +
+                        "3. All new photos are tagged as junk automatically\n" +
+                        "4. Turn off Junk Mode when done\n" +
+                        "5. Photos are auto-deleted when the timer expires\n\n" +
+                        "Note:\n" +
+                        "- Junk Mode auto-turns off in 5 min when idle, to mistakenly tag photos as junk\n" +
+                        "- Deleted photos are moved to Recycle Bin and can be recovered from there",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showInfoDialog = false }) {
+                        Text("Got it")
+                    }
                 }
             )
         }

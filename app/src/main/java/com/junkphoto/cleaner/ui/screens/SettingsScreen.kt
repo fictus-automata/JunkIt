@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -152,10 +153,10 @@ fun SettingsScreen(
                 }
             }
 
-            // Info card
+            // Privacy card
             item {
-                Spacer(modifier = Modifier.height(8.dp))
-                InfoCard()
+                Spacer(modifier = Modifier.height(24.dp))
+                PrivacyCard()
             }
 
             item { Spacer(modifier = Modifier.height(24.dp)) }
@@ -224,7 +225,7 @@ private fun TtlOptionItem(
 }
 
 @Composable
-private fun InfoCard() {
+private fun PrivacyCard() {
     Card(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
@@ -237,7 +238,7 @@ private fun InfoCard() {
                 .padding(16.dp)
         ) {
             Icon(
-                Icons.Default.Info,
+                Icons.Default.Lock, // Lock,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(20.dp)
@@ -245,17 +246,18 @@ private fun InfoCard() {
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(
-                    "How it works",
+                    "Privacy Policy",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "1. Pull down Quick Settings and tap \"Junk Mode\" tile\n" +
-                            "2. Take photos normally with your camera\n" +
-                            "3. All new photos are tagged as junk automatically\n" +
-                            "4. Turn off Junk Mode when done\n" +
-                            "5. Photos are auto-deleted when the timer expires",
+                    "JunkIt is an open-source hobby project created with user's privacy in mind. " +
+                            "Your photos and data remain strictly on your device. " +
+                            "The app doesn't require Internet connection to function. " +
+                            "We do not collect, track, or share any personal information. " +
+                            "JunkIt only require external storage permission to manage photos in your camera directory.\n\n" +
+                            "Complete source code of the project is available on GitHub at: https://github.com/fictus-automata/JunkIt",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
