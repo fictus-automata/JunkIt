@@ -1,13 +1,18 @@
 package com.junkphoto.cleaner
 
 import android.Manifest
+import android.content.ContentUris
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -24,12 +29,15 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.junkphoto.cleaner.db.JunkPhotoDatabase
+import com.junkphoto.cleaner.db.JunkPhotoEntity
 import com.junkphoto.cleaner.service.PhotoMonitorService
 import com.junkphoto.cleaner.ui.screens.HomeScreen
 import com.junkphoto.cleaner.ui.screens.SettingsScreen
 import com.junkphoto.cleaner.ui.theme.JunkItTheme
 import com.junkphoto.cleaner.util.PreferenceManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : ComponentActivity() {
 
@@ -100,6 +108,24 @@ class MainActivity : ComponentActivity() {
                                         // Deleting from DB un-junks the photo so it won't be deleted later
                                         database.junkPhotoDao().deleteById(photoId)
                                     }
+                                },
+                                onKeepPhotos = { photoIds ->
+                                    scope.launch {
+                                        database.junkPhotoDao().deleteByIds(photoIds)
+                                    }
+                                },
+                                onDeletePhotos = { photos ->
+                                    scope.launch(Dispatchers.IO) {
+                                        val deletedIds = mutableListOf<Long>()
+                                        for (photo in photos) {
+                                            if (trashOrDeletePhoto(applicationContext, photo)) {
+                                                deletedIds.add(photo.id)
+                                            }
+                                        }
+                                        if (deletedIds.isNotEmpty()) {
+                                            database.junkPhotoDao().markAsDeletedByIds(deletedIds)
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -143,5 +169,50 @@ class MainActivity : ComponentActivity() {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
+    }
+
+    private fun trashOrDeletePhoto(context: Context, photo: JunkPhotoEntity): Boolean {
+        val file = File(photo.filePath)
+        if (!file.exists()) {
+            return true // Already gone from storage
+        }
+
+        var isTrashed = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val resolver = context.contentResolver
+            val projection = arrayOf(MediaStore.Images.Media._ID)
+            val selection = "${MediaStore.Images.Media.DATA} = ?"
+            val selectionArgs = arrayOf(photo.filePath)
+            val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+
+            resolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    val mediaId = cursor.getLong(idColumn)
+                    val itemUri = ContentUris.withAppendedId(uri, mediaId)
+
+                    val values = ContentValues().apply {
+                        put(MediaStore.MediaColumns.IS_TRASHED, 1)
+                    }
+
+                    try {
+                        if (resolver.update(itemUri, values, null, null) > 0) {
+                            isTrashed = true
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Failed to move to Recycle Bin via MediaStore", e)
+                    }
+                }
+            }
+        }
+
+        // Fallback to permanent delete if not trashed
+        if (!isTrashed) {
+            if (file.delete()) {
+                isTrashed = true
+            }
+        }
+        
+        return isTrashed
     }
 }

@@ -27,11 +27,17 @@ interface JunkPhotoDao {
     @Query("UPDATE junk_photos SET deleted = 1, deletedAt = :deletedAt WHERE id = :id")
     suspend fun markAsDeleted(id: Long, deletedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE junk_photos SET deleted = 1, deletedAt = :deletedAt WHERE id IN (:ids)")
+    suspend fun markAsDeletedByIds(ids: List<Long>, deletedAt: Long = System.currentTimeMillis())
+
     @Query("DELETE FROM junk_photos WHERE deleted = 1 AND deletedAt < :before")
     suspend fun purgeOldRecords(before: Long)
 
     @Query("DELETE FROM junk_photos WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM junk_photos WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 
     @Query("SELECT * FROM junk_photos WHERE filePath = :path AND deleted = 0 LIMIT 1")
     suspend fun findByPath(path: String): JunkPhotoEntity?

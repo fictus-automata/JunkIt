@@ -1,8 +1,11 @@
 package com.junkphoto.cleaner.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +30,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -50,6 +55,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -83,10 +89,23 @@ fun HomeScreen(
     junkPhotos: List<JunkPhotoEntity>,
     onToggleJunkMode: (Boolean) -> Unit,
     onNavigateToSettings: () -> Unit,
-    onUnjunk: (Long) -> Unit
+    onUnjunk: (Long) -> Unit,
+    onKeepPhotos: (List<Long>) -> Unit,
+    onDeletePhotos: (List<JunkPhotoEntity>) -> Unit
 ) {
     // Fullscreen viewer state lifted to HomeScreen level
     var fullscreenPhoto by remember { mutableStateOf<JunkPhotoEntity?>(null) }
+    
+    // Selection state
+    var selectionMode by remember { mutableStateOf(false) }
+    val selectedPhotoIds = remember { mutableStateListOf<Long>() }
+
+    if (selectionMode) {
+        BackHandler {
+            selectionMode = false
+            selectedPhotoIds.clear()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -168,12 +187,61 @@ fun HomeScreen(
                         }
                     }
 
-                    Text(
-                        "Junk Photos",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (selectionMode) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = {
+                                    selectionMode = false
+                                    selectedPhotoIds.clear()
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Cancel")
+                                }
+                                Text(
+                                    "${selectedPhotoIds.size} selected",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            Row {
+                                TextButton(
+                                    onClick = {
+                                        onKeepPhotos(selectedPhotoIds.toList())
+                                        selectionMode = false
+                                        selectedPhotoIds.clear()
+                                    },
+                                    enabled = selectedPhotoIds.isNotEmpty()
+                                ) {
+                                    Text("Keep")
+                                }
+                                TextButton(
+                                    onClick = {
+                                        val photosToDelete = junkPhotos.filter { it.id in selectedPhotoIds }
+                                        onDeletePhotos(photosToDelete)
+                                        selectionMode = false
+                                        selectedPhotoIds.clear()
+                                    },
+                                    enabled = selectedPhotoIds.isNotEmpty(),
+                                    colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text("Delete")
+                                }
+                            }
+                        } else {
+                            Text(
+                                "Junk Photos",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
 
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(3),
@@ -225,8 +293,23 @@ fun HomeScreen(
 
                             // Photos in this group
                             items(photos, key = { it.id }) { photo ->
+                                val isSelected = selectedPhotoIds.contains(photo.id)
                                 JunkPhotoGridItem(
                                     photo = photo,
+                                    selectionMode = selectionMode,
+                                    isSelected = isSelected,
+                                    onToggleSelect = {
+                                        if (isSelected) {
+                                            selectedPhotoIds.remove(photo.id)
+                                            if (selectedPhotoIds.isEmpty()) selectionMode = false
+                                        } else {
+                                            selectedPhotoIds.add(photo.id)
+                                        }
+                                    },
+                                    onEnterSelectionMode = {
+                                        selectionMode = true
+                                        selectedPhotoIds.add(photo.id)
+                                    },
                                     onTap = { fullscreenPhoto = photo },
                                     onUnjunk = { onUnjunk(photo.id) }
                                 )
@@ -475,6 +558,10 @@ private fun ConfigInfoCard(
 @Composable
 private fun JunkPhotoGridItem(
     photo: JunkPhotoEntity,
+    selectionMode: Boolean,
+    isSelected: Boolean,
+    onToggleSelect: () -> Unit,
+    onEnterSelectionMode: () -> Unit,
     onTap: () -> Unit,
     onUnjunk: () -> Unit
 ) {
@@ -562,9 +649,27 @@ private fun JunkPhotoGridItem(
             .aspectRatio(1f)
             .clip(RoundedCornerShape(4.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
+            .then(
+                if (isSelected) Modifier.border(
+                    BorderStroke(4.dp, Color(0xFF1976D2)),
+                    RoundedCornerShape(4.dp)
+                ) else Modifier
+            )
             .combinedClickable(
-                onClick = { onTap() },
-                onLongClick = { showBottomSheet = true }
+                onClick = { 
+                    if (selectionMode) {
+                        onToggleSelect()
+                    } else {
+                        onTap() 
+                    }
+                },
+                onLongClick = { 
+                    if (!selectionMode) {
+                        onEnterSelectionMode()
+                    } else {
+                        showBottomSheet = true 
+                    }
+                }
             )
     ) {
         AsyncImage(
@@ -574,9 +679,27 @@ private fun JunkPhotoGridItem(
                 .size(300)
                 .build(),
             contentDescription = photo.fileName,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (isSelected) Modifier.padding(4.dp).clip(RoundedCornerShape(2.dp)) else Modifier
+                ),
             contentScale = ContentScale.Crop
         )
+
+        // Selection Checkmark overlay
+        if (isSelected) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = "Selected",
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .size(24.dp)
+                    .background(Color(0xFF1976D2), CircleShape)
+            )
+        }
 
         // Gradient overlay at the bottom with time remaining
         Box(
